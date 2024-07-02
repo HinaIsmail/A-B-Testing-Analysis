@@ -1,0 +1,147 @@
+import pandas as pd
+import numpy as np
+
+import scipy.stats as stats
+from scipy.stats import norm
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+from wordcloud import WordCloud
+%matplotlib inline
+input_file = '/kaggle/input/ad-ab-testing/AdSmartABdata - AdSmartABdata.csv'
+df = pd.read_csv(input_file)
+df
+df.head()
+df.head(10)
+df.info()
+df.describe()
+df.isnull()
+df.isnull().sum()
+df.shape
+df.columns
+# Set up the format and styles for plots globally
+sns.set_style('white')
+plt.rc('axes', titlesize=12)
+plt.rc('axes', labelsize=11)
+plt.rc('xtick', labelsize=10)
+plt.rc('ytick', labelsize=10)
+plt.rc('legend', fontsize=10)
+plt.rc('font', size=10)
+num_duplicates = sum(df.duplicated(subset=['auction_id']))
+
+print(f'Amount of duplicates: {num_duplicates}')
+def get_response(row):
+    '''
+    Create response column with ecnoded response values
+    :param row: list of ['yes', 'no'] columns of pandas dataframe
+    
+    '''
+    
+    if row[0] == 1:
+        res = 'yes'
+    elif row[1] == 1:
+        res = 'no'
+    else:
+        res = 'no response'
+        
+    return res
+def get_category_percent(row, decimal=1):
+    '''
+    Get percent of value distributed amoung colums
+    :param row: list of columns from pandas dataframe
+    '''
+    
+    return round(row/max(row)*100, decimal)
+df['response'] = df[['yes', 'no']].apply(get_response, axis=1)
+
+sns.displot(df.sort_values(by='experiment'), x='response', 
+            col='experiment', hue='experiment', 
+            palette=['#1CD631','#A757EE'], alpha=1)
+
+plt.show()
+
+df_response = pd.pivot_table(data=df, index='experiment', columns='response', aggfunc='count')['auction_id']
+
+df_response['total'] = df_response.apply(sum, axis=1)
+
+df_response = df_response.apply(get_category_percent, axis=1)
+
+df_response.columns.name = 'response %'
+
+df_response = df_response[['yes', 'no', 'no response']]
+
+display(df_response)
+df = df[(df['yes'] == 1) | (df['no'] == 1)]
+
+df.info()
+sns.displot(df.sort_values(by='experiment'), x='response', 
+            col='experiment', hue='experiment', 
+            palette=['#1CD631','#A757EE'], alpha=1, height=3, aspect=0.9)
+
+plt.show()
+
+df_response = pd.pivot_table(data=df, index='experiment', columns='response', aggfunc='count')['auction_id']
+
+df_response['total'] = df_response.apply(sum, axis=1)
+
+df_response = df_response.apply(get_category_percent, axis=1)
+
+df_response.columns.name = 'response %'
+
+df_response = df_response[['yes', 'no']]
+
+display(df_response)
+sns.catplot(data=df.sort_values(by='experiment'), x='experiment', 
+            kind='count', height=3, palette=['#1CD631','#A757EE'])\
+            .set(title='Amount of users in exposed and control groups')
+plt.show()
+
+print('Percent of users in control group: {:.1%}'\
+      .format(len(df[df['experiment']=='control'])/len(df)))
+print('Percent of users in exposed group: {:.1%}'\
+      .format(len(df[df['experiment']=='exposed'])/len(df)))
+print('First date of experiment: {}'.format(df['date'].min()))
+print('Last date of experiment:  {}'.format(df['date'].max()))
+fig, ax = plt.subplots(figsize=(10,5))
+
+g = sns.lineplot(data=df.groupby(['experiment', 'date'])['date'].count()['control'], 
+                ax=ax, label='control', color='#1CD631', linewidth = 4)
+g = sns.lineplot(data=df.groupby(['experiment', 'date'])['date'].count()['exposed'], 
+                ax=ax, label='exposed', color='#A757EE', linewidth = 4)
+
+ax.grid(True)
+ax.set_ylabel('count')
+ax.set_title('Amount of users versus date')
+plt.show()
+sns.set_style("whitegrid")
+
+sns.displot(df.sort_values(by='experiment'), x='hour', col='experiment', 
+            bins=range(24), hue='experiment', 
+            palette=['#1CD631','#A757EE'], alpha=1)
+
+plt.text(-25, 100, "Mean = {:.0f} Impressions/h"\
+         .format(df[df['experiment']=='control']\
+                 .groupby('hour')['experiment'].count().mean()))
+
+plt.text(-22, 225, "Anomaly at 15 h:\n{:.0f} Impressions/h"\
+         .format(df[df['experiment']=='control']\
+                 .groupby('hour')['experiment'].count().max()))
+
+plt.text(0, 100, "Mean = {:.0f} Impressions/h"\
+         .format(df[df['experiment']=='exposed']\
+                 .groupby('hour')['experiment'].count().mean()))
+
+
+plt.show()
+sns.set_style("whitegrid")
+
+sns.displot(df.sort_values(by=['date','experiment']), x='hour', col='date', bins=range(24), 
+            hue='experiment', palette=['#1CD631','#A757EE'], alpha=1,
+            multiple="dodge", col_wrap=3, facet_kws=dict(sharey=True))
+plt.ylim([0, 20])
+
+plt.text(-24, 60, "Anomaly at 15 h:\n{:.0f} Impressions/h     ->"\
+         .format(df[df['experiment']=='control']\
+                 .groupby('hour')['experiment'].count().max()))
+plt.show()
